@@ -25,6 +25,7 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
 LOOKAHEAD_WPS = 50  # Number of waypoints we will publish. You can change this number
+MAX_DECEL = 1.0
 
 
 class WaypointUpdater(object):
@@ -54,8 +55,7 @@ class WaypointUpdater(object):
         rate = rospy.Rate(50)
         while not rospy.is_shutdown():
             if self.pose and self.base_waypoints and self.waypoints_tree:
-                closest_waypoint_idx = self.get_closest_waypoint_idx()
-                self.publish_waypoints(closest_waypoint_idx)
+                self.publish_waypoints()
             rate.sleep()
 
     def get_closest_waypoint_idx(self):
@@ -112,11 +112,41 @@ class WaypointUpdater(object):
             wp1 = i
         return dist
 
-    def publish_waypoints(self, closest_idx):
+    def generate_lane(self):
+
         lane = Lane()
-        lane.header = self.base_waypoints.header
-        # using slicing like a circular buffer
-        lane.waypoints = self.base_waypoints.waypoints[closest_idx: closest_idx + LOOKAHEAD_WPS]
+        wp_idx_closest = self.get_closest_waypoint_idx()
+        wp_idx_farthest = wp_idx_closest + LOOKAHEAD_WPS
+        wps = self.base_waypoints.waypoints[wp_idx_closest: wp_idx_farthest]
+
+        if self.wp_index_closest_light == -1 \
+                or self.wp_index_closest_light >= wp_idx_farthest:
+            # using slicing like a circular buffer
+            lane.waypoints = self.base_waypoints.waypoints[wp_idx_closest: wp_idx_farthest]
+        else:
+            lane.waypoints = self.decelerate_wps(wps, wp_idx_closest)
+        return lane
+
+    def decelerate_wps(self, waypoints, wp_idx_closest):
+        ret = list()
+        for i, wp in enumerate(waypoints):
+
+            p = Waypoint()
+            p.pose = wp.pose
+
+            wp_idx_stop = max(self.wp_index_closest_light - wp_idx_closest - 2, 0)
+            d = self.distance(waypoints, i, wp_idx_stop)
+            v = math.sqrt(2 * MAX_DECEL * d)
+            v = 0.0 if v < 1.0 else v
+
+            p.twist.twist.linear.x = min(v, wp.twist.twist.linear.x)
+
+            ret.append(p)
+
+        return ret
+
+    def publish_waypoints(self):
+        lane = self.generate_lane()
         self.final_waypoints_pub.publish(lane)
 
 
