@@ -1,4 +1,5 @@
 from styx_msgs.msg import TrafficLight
+import random
 
 
 class TLClassifier(object):
@@ -18,4 +19,5 @@ class TLClassifier(object):
 
         """
         # TODO implement light color prediction
-        return TrafficLight.UNKNOWN
+        return random.choice([TrafficLight.RED, TrafficLight.YELLOW,
+                              TrafficLight.GREEN])
