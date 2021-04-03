@@ -5,6 +5,7 @@ from scipy.spatial import KDTree
 import numpy as np
 from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane, Waypoint
+from std_msgs.msg import Int32
 
 import math
 
@@ -34,7 +35,8 @@ class WaypointUpdater(object):
         rospy.Subscriber('/base_waypoints', Lane, self.cb_waypoints)
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
-        # rospy.Subscriber('/traffic_waypoint', Int32, self.cb_waypoints)
+        rospy.Subscriber('/traffic_waypoint', Int32, self.cb_traffic)
+        # rospy.Subscriber('/obstacle_waypoint', Int32, self.cb_obstacle)
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
@@ -43,12 +45,13 @@ class WaypointUpdater(object):
         self.base_waypoints = None
         self.waypoints_2d = None
         self.waypoints_tree = None
+        self.wp_index_closest_light = -1
 
         # using this function to have control of publishing rate
         self.loop()
 
     def loop(self):
-        rate = rospy.Rate(30)
+        rate = rospy.Rate(50)
         while not rospy.is_shutdown():
             if self.pose and self.base_waypoints and self.waypoints_tree:
                 closest_waypoint_idx = self.get_closest_waypoint_idx()
@@ -89,7 +92,7 @@ class WaypointUpdater(object):
 
     def cb_traffic(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
-        pass
+        self.wp_index_closest_light = msg.data
 
     def cb_obstacle(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
